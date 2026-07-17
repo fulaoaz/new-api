@@ -28,11 +28,15 @@ The same sequence is available from GitHub Actions under **Sync upstream
 main**. It runs automatically every six hours (at minute 17, UTC) and can also
 be started manually. If the merge conflicts or the focused tests fail, the
 workflow stops before pushing to `main`, so no image is published from a failed
-sync.
+sync. After a successful upstream merge is pushed, the sync workflow explicitly
+starts the GHCR publication workflow. This explicit dispatch is required because
+GitHub does not recursively trigger a `push` workflow from a commit made with
+the default Actions token.
 
 ## Image publication
 
-Every push to fork `main` runs **Publish fork image to GHCR** and publishes:
+Every normal push to fork `main`, plus every successful automatic upstream sync,
+runs **Publish fork image to GHCR** and publishes:
 
 ```text
 ghcr.io/fulaoaz/new-api:latest
