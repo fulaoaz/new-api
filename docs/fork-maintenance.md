@@ -25,8 +25,10 @@ If Git reports a conflict, resolve it locally, rerun the focused tests, and
 push only after the custom endpoint still passes.
 
 The same sequence is available from GitHub Actions under **Sync upstream
-main**. It is intentionally manual so an upstream change is reviewed before a
-new server image is published.
+main**. It runs automatically every six hours (at minute 17, UTC) and can also
+be started manually. If the merge conflicts or the focused tests fail, the
+workflow stops before pushing to `main`, so no image is published from a failed
+sync.
 
 ## Image publication
 
