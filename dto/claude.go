@@ -436,6 +436,19 @@ func ProcessTools(tools []any) ([]*Tool, []*ClaudeWebSearchTool) {
 			normalTools = append(normalTools, &t)
 		case ClaudeWebSearchTool:
 			webSearchTools = append(webSearchTools, &t)
+		case map[string]any:
+			toolType, _ := t["type"].(string)
+			if strings.HasPrefix(toolType, "web_search") {
+				parsed, err := common.Any2Type[ClaudeWebSearchTool](t)
+				if err == nil {
+					webSearchTools = append(webSearchTools, &parsed)
+				}
+				continue
+			}
+			parsed, err := common.Any2Type[Tool](t)
+			if err == nil {
+				normalTools = append(normalTools, &parsed)
+			}
 		default:
 			// 未知类型，跳过
 			continue
