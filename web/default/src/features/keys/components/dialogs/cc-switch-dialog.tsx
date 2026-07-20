@@ -28,21 +28,23 @@ import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { getUserModels } from '@/lib/api'
 
+import { CodexSetupPanel } from './codex-setup-panel'
+
 const APP_CONFIGS = {
+  codex: {
+    label: 'Codex',
+    defaultName: 'New API Codex',
+    modelFields: [{ key: 'model', labelKey: 'Primary Model', required: true }],
+  },
   claude: {
-    label: 'Claude',
-    defaultName: 'My Claude',
+    label: 'Claude Code',
+    defaultName: 'New API Claude Code',
     modelFields: [
       { key: 'model', labelKey: 'Primary Model', required: true },
       { key: 'haikuModel', labelKey: 'Haiku Model', required: false },
       { key: 'sonnetModel', labelKey: 'Sonnet Model', required: false },
       { key: 'opusModel', labelKey: 'Opus Model', required: false },
     ],
-  },
-  codex: {
-    label: 'Codex',
-    defaultName: 'My Codex',
-    modelFields: [{ key: 'model', labelKey: 'Primary Model', required: true }],
   },
   gemini: {
     label: 'Gemini',
@@ -73,7 +75,7 @@ function buildCCSwitchURL(
   apiKey: string
 ): string {
   const serverAddress = getServerAddress()
-  const endpoint = app === 'codex' ? serverAddress + '/v1' : serverAddress
+  const endpoint = app === 'codex' ? `${serverAddress}/v1` : serverAddress
   const params = new URLSearchParams()
   params.set('resource', 'provider')
   params.set('app', app)
@@ -96,8 +98,8 @@ interface Props {
 
 export function CCSwitchDialog(props: Props) {
   const { t } = useTranslation()
-  const [app, setApp] = useState<AppType>('claude')
-  const [name, setName] = useState<string>(APP_CONFIGS.claude.defaultName)
+  const [app, setApp] = useState<AppType>('codex')
+  const [name, setName] = useState<string>(APP_CONFIGS.codex.defaultName)
   const [models, setModels] = useState<Record<string, string>>({})
 
   const { data: modelsData } = useQuery({
@@ -117,13 +119,30 @@ export function CCSwitchDialog(props: Props) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setModels({})
 
-      setApp('claude')
+      setApp('codex')
 
-      setName(APP_CONFIGS.claude.defaultName)
+      setName(APP_CONFIGS.codex.defaultName)
     }
   }, [props.open])
 
+  useEffect(() => {
+    if (!props.open || models.model) return
+    const availableModels = modelsData?.data ?? []
+    if (availableModels.length === 0) return
+
+    let defaultModel = availableModels[0]
+    if (app === 'codex' && availableModels.includes('grok-4.5')) {
+      defaultModel = 'grok-4.5'
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setModels((previous) => ({ ...previous, model: defaultModel }))
+  }, [app, models.model, modelsData?.data, props.open])
+
   const currentConfig = APP_CONFIGS[app]
+  const serverAddress = getServerAddress()
+  const normalizedKey = props.tokenKey.startsWith('sk-')
+    ? props.tokenKey
+    : `sk-${props.tokenKey}`
 
   const handleAppChange = (val: string) => {
     const appVal = val as AppType
@@ -137,10 +156,7 @@ export function CCSwitchDialog(props: Props) {
       toast.warning(t('Please select a primary model'))
       return
     }
-    const key = props.tokenKey.startsWith('sk-')
-      ? props.tokenKey
-      : `sk-${props.tokenKey}`
-    const url = buildCCSwitchURL(app, name, models, key)
+    const url = buildCCSwitchURL(app, name, models, normalizedKey)
     window.open(url, '_blank')
     props.onOpenChange(false)
   }
@@ -149,18 +165,25 @@ export function CCSwitchDialog(props: Props) {
     <Dialog
       open={props.open}
       onOpenChange={props.onOpenChange}
-      title={t('Import to CC Switch')}
-      contentClassName='sm:max-w-md'
+      title={t('Configure AI coding clients')}
+      description={t(
+        'Use the selected API key with Codex, Claude Code, or Gemini CLI.'
+      )}
+      contentClassName={app === 'codex' ? 'sm:max-w-3xl' : 'sm:max-w-md'}
       contentHeight='auto'
       bodyClassName={
-        currentConfig.modelFields.length === 1 ? 'space-y-4 pb-52' : 'space-y-4'
+        app !== 'codex' && currentConfig.modelFields.length === 1
+          ? 'space-y-4 pb-52'
+          : 'space-y-4'
       }
       footer={
         <>
           <Button variant='outline' onClick={() => props.onOpenChange(false)}>
-            {t('Cancel')}
+            {app === 'codex' ? t('Close') : t('Cancel')}
           </Button>
-          <Button onClick={handleSubmit}>{t('Open CC Switch')}</Button>
+          {app !== 'codex' && (
+            <Button onClick={handleSubmit}>{t('Open CC Switch')}</Button>
+          )}
         </>
       }
     >
@@ -196,7 +219,7 @@ export function CCSwitchDialog(props: Props) {
             onValueChange={setName}
             placeholder={currentConfig.defaultName}
             emptyText=''
-            allowCustomValue={true}
+            allowCustomValue
           />
         </div>
 
@@ -219,6 +242,15 @@ export function CCSwitchDialog(props: Props) {
             />
           </div>
         ))}
+
+        {app === 'codex' && models.model && (
+          <CodexSetupPanel
+            apiKey={normalizedKey}
+            endpoint={serverAddress}
+            model={models.model}
+            providerName={name}
+          />
+        )}
       </div>
     </Dialog>
   )
