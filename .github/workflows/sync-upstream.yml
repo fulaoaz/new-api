@@ -36,7 +36,21 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git merge --no-edit upstream/main
+          # The repository GITHUB_TOKEN cannot create or update workflow files.
+          # Keep this fork's reviewed workflows while merging every other
+          # upstream change, including when only workflow conflicts occur.
+          set +e
+          git merge --no-commit --no-edit upstream/main
+          merge_status=$?
+          set -e
+          git restore --source=HEAD --staged --worktree -- .github/workflows
+          git add -A .github/workflows
+          unresolved="$(git diff --name-only --diff-filter=U)"
+          if [ -n "$unresolved" ]; then
+            printf 'Unresolved upstream merge conflicts:\n%s\n' "$unresolved" >&2
+            exit "${merge_status:-1}"
+          fi
+          git commit --no-edit
           echo "changed=true" >> "$GITHUB_OUTPUT"
 
       - name: Set up Go
